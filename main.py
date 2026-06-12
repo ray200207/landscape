@@ -24,7 +24,6 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
-from fastapi.staticfiles import StaticFiles
 from PIL import Image
 from pydantic import BaseModel, Field, model_validator
 
@@ -70,8 +69,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-app.mount("/js", StaticFiles(directory="js"), name="js")
 
 
 # ════════════════════════════════════════════════════════════════════════════════
@@ -421,21 +418,6 @@ def build_emotion_prompt(scene_type: Optional[str], landscape_desc: Optional[str
 @app.get("/", tags=["頁面"])
 async def serve_index():
     return FileResponse("index.html")
-
-
-@app.get("/result.html", tags=["頁面"])
-async def serve_result():
-    return FileResponse("result.html")
-
-
-@app.get("/emotion.html", tags=["頁面"])
-async def serve_emotion():
-    return FileResponse("emotion.html")
-
-
-@app.get("/map.html", tags=["頁面"])
-async def serve_map():
-    return FileResponse("map.html")
 
 
 # 暫存圖片（供 /api/upload 使用）

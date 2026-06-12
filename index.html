@@ -1,1200 +1,974 @@
 <!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>城市景觀解析 · Urban Landscape Lab</title>
-  <style>
-    /* ── Reset & Base ─────────────────────────────── */
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>城市景觀解析 · Urban Landscape Lab</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --color-bg:#0f0f13;--color-surface:#1a1a24;--color-border:#2e2e42;
+  --color-accent:#5c8aff;--color-accent2:#ff8c5c;--color-text:#d4d4e8;--color-muted:#8888aa;
+  --font-sans:'Segoe UI','Noto Sans TC',sans-serif;--font-mono:'Cascadia Code','Courier New',monospace;
+  --radius:8px;--transition:.25s ease;--max-w:1100px;
+}
+html{scroll-behavior:smooth}
+body{font-family:var(--font-sans);background:var(--color-bg);color:var(--color-text);line-height:1.7;min-height:100vh;padding-bottom:3rem}
+.hidden{display:none!important}
+.container{width:100%;max-width:var(--max-w);margin-inline:auto;padding-inline:1.5rem}
+img{display:block;max-width:100%}
+button{font-family:inherit}
 
-    :root {
-      --color-bg:       #0f0f13;
-      --color-surface:  #1a1a24;
-      --color-border:   #2e2e42;
-      --color-accent:   #5c8aff;
-      --color-accent2:  #ff8c5c;
-      --color-text:     #d4d4e8;
-      --color-muted:    #ffffff;
-      --font-sans:      'Segoe UI', 'Noto Sans TC', sans-serif;
-      --font-mono:      'Cascadia Code', 'Courier New', monospace;
-      --max-w:          1100px;
-      --radius:         8px;
-      --transition:     0.25s ease;
-    }
+/* ── Header / Step indicator ─────────────────────────────── */
+.site-header{position:sticky;top:0;z-index:100;background:rgba(15,15,19,.85);backdrop-filter:blur(12px);border-bottom:1px solid var(--color-border)}
+.nav{display:flex;align-items:center;justify-content:space-between;height:64px;flex-wrap:wrap;gap:.8rem}
+.nav-logo{font-family:var(--font-mono);font-size:1.05rem;font-weight:700;color:#fff;letter-spacing:.05em}
+.nav-logo span{color:var(--color-accent)}
+.steps{display:flex;align-items:center;gap:.5rem}
+.step{display:flex;align-items:center;gap:.5rem;font-size:.78rem;font-family:var(--font-mono);color:var(--color-muted);transition:color var(--transition)}
+.step-num{display:flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;border:1px solid var(--color-border);font-size:.72rem;transition:all var(--transition)}
+.step.active{color:#fff}
+.step.active .step-num{background:var(--color-accent);border-color:var(--color-accent);color:#fff;box-shadow:0 0 0 4px rgba(92,138,255,.18)}
+.step.done .step-num{background:var(--color-accent2);border-color:var(--color-accent2);color:#fff}
+.step-sep{width:20px;height:1px;background:var(--color-border)}
+.step-label{display:none}
+@media (min-width:680px){.step-label{display:inline}}
 
-    html { scroll-behavior: smooth; }
+/* ── Main layout ──────────────────────────────────────────── */
+.main-content{padding-top:2.2rem}
+.page-title{font-size:clamp(1.5rem,3vw,2rem);font-weight:700;color:#fff;margin-bottom:.3rem}
+.page-sub{color:var(--color-muted);font-size:.9rem;margin-bottom:2rem}
+.section-label{font-family:var(--font-mono);font-size:.78rem;letter-spacing:.15em;text-transform:uppercase;color:var(--color-accent);margin-bottom:.4rem}
+.card{background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius);padding:1.4rem 1.6rem;margin-bottom:1.5rem}
+.card-title{font-family:var(--font-mono);font-size:.72rem;letter-spacing:.15em;text-transform:uppercase;color:var(--color-accent);margin-bottom:1rem}
 
-    body {
-      font-family: var(--font-sans);
-      background: var(--color-bg);
-      color: var(--color-text);
-      line-height: 1.7;
-    }
+/* ── Step 1: Upload layout ────────────────────────────────── */
+.az-layout{display:grid;grid-template-columns:1fr 1fr;gap:2.5rem;align-items:start}
+@media (max-width:820px){.az-layout{grid-template-columns:1fr}}
 
-    a { color: var(--color-accent); text-decoration: none; transition: opacity var(--transition); }
-    a:hover { opacity: 0.8; }
+.az-dropzone{width:100%;aspect-ratio:4/3;background:var(--color-bg);border:2px dashed var(--color-border);border-radius:var(--radius);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:border-color var(--transition),background var(--transition),transform var(--transition),box-shadow var(--transition);overflow:hidden;position:relative}
+.az-dropzone:hover{border-color:var(--color-accent);background:rgba(92,138,255,.04)}
+.az-dropzone.drag-over{border-color:var(--color-accent);background:rgba(92,138,255,.07);transform:scale(1.012);box-shadow:0 0 0 4px rgba(92,138,255,.2)}
+.az-dropzone img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.az-preview-overlay{position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,.6) 0%,transparent 50%);pointer-events:none}
+.az-clear-btn{position:absolute;top:.6rem;right:.6rem;width:2rem;height:2rem;border-radius:50%;background:rgba(0,0,0,.55);border:none;color:#fff;font-size:1.15rem;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background var(--transition);z-index:5}
+.az-clear-btn:hover{background:rgba(220,38,38,.8)}
+.az-file-info{position:absolute;bottom:.6rem;left:.75rem;right:.75rem;display:flex;align-items:center;gap:.5rem;z-index:5}
+.az-file-name{font-family:var(--font-mono);font-size:.72rem;background:rgba(255,255,255,.18);backdrop-filter:blur(6px);border-radius:999px;padding:.2rem .75rem;color:#fff;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.az-gps-badge{font-size:.72rem;background:rgba(92,138,255,.75);backdrop-filter:blur(6px);border-radius:999px;padding:.2rem .7rem;color:#fff;display:none}
+.az-gps-badge.visible{display:inline-block}
+.az-placeholder{display:flex;flex-direction:column;align-items:center;gap:.7rem;color:var(--color-muted);font-size:.88rem;text-align:center;padding:2rem;pointer-events:none}
+.az-placeholder-icon{font-size:3rem;opacity:.4;animation:az-pulse 2s ease-in-out infinite}
+@keyframes az-pulse{0%,100%{opacity:.4}50%{opacity:.15}}
+.az-placeholder-hint{font-size:.75rem;font-family:var(--font-mono);opacity:.6}
+.az-drag-hint{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;gap:.7rem;background:rgba(92,138,255,.08);pointer-events:none;z-index:4}
+.az-drag-hint.visible{display:flex}
+.az-drag-hint-icon{font-size:2.5rem}
+.az-drag-hint-text{font-size:1rem;font-weight:700;color:var(--color-accent)}
+.az-upload-hint{font-size:.75rem;color:var(--color-muted);font-family:var(--font-mono);opacity:.6;margin-top:.5rem}
+.az-error{margin-top:.8rem;background:rgba(255,92,92,.08);border:1px solid rgba(255,92,92,.3);border-radius:var(--radius);padding:.9rem 1.2rem;font-size:.83rem;color:#ff8080;display:none;font-family:var(--font-mono)}
+.az-error.visible{display:block}
 
-    img { display: block; max-width: 100%; }
+.az-right-panel{display:flex;flex-direction:column;gap:1.2rem}
+.az-scene-group{display:flex;flex-wrap:wrap;gap:.5rem}
+.az-scene-pill{padding:.3rem .9rem;border:1px solid var(--color-border);border-radius:999px;font-size:.8rem;color:var(--color-muted);background:transparent;cursor:pointer;transition:background var(--transition),color var(--transition),border-color var(--transition),box-shadow var(--transition);font-family:var(--font-sans)}
+.az-scene-pill:hover{border-color:var(--color-accent);color:#fff}
+.az-scene-pill.active{background:var(--color-accent);color:#fff;border-color:var(--color-accent);box-shadow:0 2px 10px rgba(92,138,255,.4)}
 
-    .container {
-      width: 100%;
-      max-width: var(--max-w);
-      margin-inline: auto;
-      padding-inline: 1.5rem;
-    }
+.az-analyze-btn{width:100%;padding:.8rem 1.5rem;border-radius:var(--radius);font-size:.95rem;font-weight:600;color:#fff;background:linear-gradient(135deg,var(--color-accent),#3a6be8);border:none;cursor:pointer;transition:transform var(--transition),box-shadow var(--transition),opacity var(--transition);box-shadow:0 4px 20px rgba(92,138,255,.3);display:flex;align-items:center;justify-content:center;gap:.5rem}
+.az-analyze-btn:hover:not(:disabled){transform:translateY(-2px);box-shadow:0 6px 28px rgba(92,138,255,.5)}
+.az-analyze-btn:disabled{opacity:.4;cursor:not-allowed}
 
-    .section-label {
-      font-family: var(--font-mono);
-      font-size: 0.78rem;
-      letter-spacing: 0.15em;
-      text-transform: uppercase;
-      color: var(--color-accent);
-      margin-bottom: 0.5rem;
-    }
+.az-elements-info{display:flex;flex-direction:column;gap:.6rem}
+.az-element-row{display:flex;align-items:center;gap:.6rem;font-size:.82rem}
+.az-element-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.az-element-name{color:#fff;min-width:6.5em}
+.az-element-desc{color:var(--color-muted);font-size:.76rem}
 
-    .section-title {
-      font-size: clamp(1.6rem, 3vw, 2.2rem);
-      font-weight: 700;
-      color: #fff;
-      margin-bottom: 1rem;
-    }
+/* ── Step 2: Result ───────────────────────────────────────── */
+.progress-card{display:flex;flex-direction:column;align-items:center;gap:1rem;padding:3rem 1.5rem;text-align:center}
+.progress-spinner{width:42px;height:42px;border:3px solid var(--color-border);border-top-color:var(--color-accent);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.progress-text{font-family:var(--font-mono);font-size:.85rem;letter-spacing:.1em;color:var(--color-accent)}
+.az-progress-wrap{width:100%;max-width:360px;height:4px;background:var(--color-border);border-radius:2px;overflow:hidden;display:none}
+.az-progress-wrap.visible{display:block}
+.az-progress-bar{height:100%;background:linear-gradient(90deg,var(--color-accent),var(--color-accent2));border-radius:2px;animation:az-progress 1.8s ease-in-out infinite}
+@keyframes az-progress{0%{width:0%}70%{width:80%}100%{width:90%}}
 
-    .divider {
-      width: 48px;
-      height: 3px;
-      background: linear-gradient(90deg, var(--color-accent), var(--color-accent2));
-      border-radius: 2px;
-      margin-bottom: 2.5rem;
-    }
+.res-media-row{display:flex;gap:1.2rem;align-items:center;margin-bottom:1.5rem;flex-wrap:wrap}
+.res-media-thumb{width:120px;height:90px;border-radius:var(--radius);overflow:hidden;border:1px solid var(--color-border);flex-shrink:0}
+.res-media-thumb img{width:100%;height:100%;object-fit:cover}
+.res-badges{display:flex;flex-direction:column;gap:.5rem;font-size:.8rem}
+.badge{display:inline-flex;align-items:center;gap:.3rem;background:rgba(92,138,255,.15);color:var(--color-accent);border-radius:999px;padding:.25rem .8rem;font-size:.78rem;width:fit-content}
+.badge-gps{background:rgba(255,140,92,.15);color:var(--color-accent2)}
+.badge-muted{color:var(--color-muted);font-family:var(--font-mono);font-size:.74rem}
 
-    /* ── Header / Nav ─────────────────────────────── */
-    .site-header {
-      position: sticky;
-      top: 0;
-      z-index: 100;
-      background: rgba(15, 15, 19, 0.85);
-      backdrop-filter: blur(12px);
-      border-bottom: 1px solid var(--color-border);
-    }
+.res-grid{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem}
+@media (max-width:820px){.res-grid{grid-template-columns:1fr}}
+.chart-wrap{position:relative;width:100%;max-width:260px;margin:0 auto;aspect-ratio:1/1}
+.chart-center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none}
+.chart-center-pct{font-size:1.6rem;font-weight:700;color:#fff}
+.chart-center-name{font-size:.78rem;color:var(--color-muted);margin-top:.2rem}
 
-    .nav {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      height: 60px;
-    }
+#elements-list{display:flex;flex-direction:column;gap:1rem}
+.res-element-row{display:flex;flex-direction:column;gap:.35rem}
+.res-element-head{display:flex;align-items:center;gap:.5rem;font-size:.85rem}
+.res-element-icon{font-size:1rem}
+.res-element-name{color:#fff;flex:1}
+.res-element-pct{font-family:var(--font-mono);color:var(--color-muted)}
+.res-bar-track{height:6px;background:var(--color-bg);border-radius:3px;overflow:hidden;border:1px solid var(--color-border)}
+.res-bar-fill{height:100%;border-radius:3px;width:0%;transition:width 1s ease}
+.res-element-desc{font-size:.74rem;color:var(--color-muted)}
 
-    .nav-logo {
-      font-family: var(--font-mono);
-      font-size: 1.05rem;
-      font-weight: 700;
-      color: #fff;
-      letter-spacing: 0.05em;
-    }
-    .nav-logo span { color: var(--color-accent); }
+.description-text{font-size:.92rem;line-height:1.9;color:var(--color-text)}
 
-    .nav-links {
-      display: flex;
-      gap: 2rem;
-      list-style: none;
-    }
+.emo-summary{display:flex;gap:1.5rem;align-items:center;flex-wrap:wrap;margin-bottom:1.5rem}
+.color-swatch{width:64px;height:64px;border-radius:50%;border:3px solid var(--color-border);flex-shrink:0;box-shadow:0 0 24px 4px var(--swatch-glow,transparent)}
+.emo-summary-text{flex:1;min-width:160px}
+.emo-dominant{font-size:1.1rem;font-weight:700;color:#fff;margin-bottom:.3rem}
+.color-meta{font-family:var(--font-mono);font-size:.78rem;color:var(--color-muted)}
+.radar-wrap{width:220px;height:220px;flex-shrink:0;margin-inline:auto}
+.emotion-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:1rem}
+.emo-card{background:var(--color-bg);border:1px solid var(--color-border);border-radius:var(--radius);padding:.9rem 1rem}
+.emo-card-head{display:flex;align-items:center;gap:.4rem;margin-bottom:.5rem}
+.emo-icon{font-size:1.05rem}
+.emo-name{color:#fff;font-size:.86rem;flex:1}
+.emo-score{font-family:var(--font-mono);font-weight:700;font-size:.9rem}
+.emo-dots{display:flex;gap:.25rem;margin-bottom:.5rem}
+.emo-dot{width:10px;height:10px;border-radius:50%;border:1px solid var(--color-border);background:transparent}
+.emo-reason{font-size:.76rem;color:var(--color-muted);line-height:1.6}
 
-    .nav-links a {
-      color: var(--color-muted);
-      font-size: 0.9rem;
-      transition: color var(--transition);
-    }
-    .nav-links a:hover { color: #fff; opacity: 1; }
+.actions-row{display:flex;gap:1rem;flex-wrap:wrap;justify-content:center;margin-top:1rem}
+.btn-primary,.btn-secondary,.btn-danger,.btn-text{padding:.7rem 1.6rem;border-radius:var(--radius);font-size:.9rem;font-weight:600;cursor:pointer;border:1px solid var(--color-border);background:var(--color-surface);color:var(--color-text);transition:transform var(--transition),box-shadow var(--transition),opacity var(--transition),background var(--transition)}
+.btn-primary{background:linear-gradient(135deg,var(--color-accent),#3a6be8);color:#fff;border:none;box-shadow:0 4px 20px rgba(92,138,255,.3)}
+.btn-primary:hover{transform:translateY(-2px);box-shadow:0 6px 28px rgba(92,138,255,.5)}
+.btn-secondary:hover{border-color:var(--color-accent);color:#fff}
+.btn-danger{color:#ff8080;border-color:rgba(255,92,92,.3)}
+.btn-danger:hover{background:rgba(255,92,92,.1)}
+.btn-text{background:none;border:none;color:var(--color-accent);text-decoration:underline;text-underline-offset:3px;padding:.5rem 0}
+.btn-sm{padding:.4rem 1rem;font-size:.8rem}
 
-    /* ── Hero ─────────────────────────────────────── */
-    .hero {
-      position: relative;
-      min-height: 90vh;
-      display: flex;
-      align-items: center;
-      overflow: hidden;
-    }
-
-    .hero-bg {
-      position: absolute;
-      inset: 0;
-      background:
-        linear-gradient(180deg, transparent 55%, var(--color-bg) 100%),
-        linear-gradient(135deg, #0d1b3e 0%, #0f0f13 60%);
-    }
-
-    .hero-grid {
-      position: absolute;
-      inset: 0;
-      background-image:
-        linear-gradient(var(--color-border) 1px, transparent 1px),
-        linear-gradient(90deg, var(--color-border) 1px, transparent 1px);
-      background-size: 60px 60px;
-      opacity: 0.25;
-      mask-image: linear-gradient(180deg, transparent, rgba(0,0,0,0.6) 40%, transparent 100%);
-    }
-
-    .hero-content {
-      position: relative;
-      z-index: 1;
-    }
-
-    .hero-eyebrow {
-      font-family: var(--font-mono);
-      font-size: 0.82rem;
-      letter-spacing: 0.2em;
-      text-transform: uppercase;
-      color: var(--color-accent);
-      margin-bottom: 1.2rem;
-    }
-
-    .hero-title {
-      font-size: clamp(2.4rem, 6vw, 4.5rem);
-      font-weight: 800;
-      line-height: 1.15;
-      color: #fff;
-      margin-bottom: 1.5rem;
-    }
-    .hero-title em {
-      font-style: normal;
-      background: linear-gradient(90deg, var(--color-accent), var(--color-accent2));
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-    }
-
-    .hero-desc {
-      max-width: 540px;
-      font-size: 1.1rem;
-      color: var(--color-muted);
-      margin-bottom: 2.5rem;
-    }
-
-    .btn {
-      display: inline-block;
-      padding: 0.75rem 1.8rem;
-      border-radius: var(--radius);
-      font-size: 0.95rem;
-      font-weight: 600;
-      transition: transform var(--transition), box-shadow var(--transition);
-    }
-    .btn:hover { transform: translateY(-2px); opacity: 1; }
-
-    .btn-primary {
-      background: linear-gradient(135deg, var(--color-accent), #3a6be8);
-      color: #fff;
-      box-shadow: 0 4px 20px rgba(92, 138, 255, 0.35);
-    }
-    .btn-primary:hover { box-shadow: 0 6px 28px rgba(92, 138, 255, 0.5); }
-
-    .btn-outline {
-      border: 1px solid var(--color-border);
-      color: var(--color-text);
-      margin-left: 1rem;
-    }
-    .btn-outline:hover { border-color: var(--color-accent); color: var(--color-accent); }
-
-    .hero-stats {
-      display: flex;
-      gap: 3rem;
-      margin-top: 4rem;
-      padding-top: 2rem;
-      border-top: 1px solid var(--color-border);
-    }
-
-    .stat-num {
-      font-size: 2rem;
-      font-weight: 800;
-      color: #fff;
-      font-family: var(--font-mono);
-    }
-    .stat-label {
-      font-size: 0.82rem;
-      color: var(--color-muted);
-      margin-top: 0.2rem;
-    }
-
-    /* ── About ────────────────────────────────────── */
-    .about { padding-block: 6rem; }
-
-    .about-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 4rem;
-      align-items: center;
-    }
-
-    .about-text p { color: var(--color-muted); margin-bottom: 1rem; }
-
-    .tag-list {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.5rem;
-      margin-top: 1.5rem;
-    }
-
-    .tag {
-      padding: 0.3rem 0.9rem;
-      background: var(--color-surface);
-      border: 1px solid var(--color-border);
-      border-radius: 999px;
-      font-size: 0.8rem;
-      color: var(--color-muted);
-      font-family: var(--font-mono);
-    }
-
-    .feature-cards { display: grid; gap: 1rem; }
-
-    .feature-card {
-      background: var(--color-surface);
-      border: 1px solid var(--color-border);
-      border-radius: var(--radius);
-      padding: 1.2rem 1.5rem;
-      display: flex;
-      align-items: flex-start;
-      gap: 1rem;
-      transition: border-color var(--transition);
-    }
-    .feature-card:hover { border-color: var(--color-accent); }
-
-    .feature-icon { font-size: 1.5rem; flex-shrink: 0; margin-top: 0.1rem; }
-    .feature-card h4 { color: #fff; font-size: 0.95rem; margin-bottom: 0.25rem; }
-    .feature-card p  { color: var(--color-muted); font-size: 0.85rem; line-height: 1.5; }
-
-    /* ── Contact ──────────────────────────────────── */
-    .contact { padding-block: 6rem; text-align: center; }
-    .contact .section-label,
-    .contact .section-title,
-    .contact .divider { margin-inline: auto; }
-
-    .contact-desc {
-      max-width: 480px;
-      margin-inline: auto;
-      color: var(--color-muted);
-      margin-bottom: 2.5rem;
-    }
-
-    .social-links {
-      display: flex;
-      justify-content: center;
-      gap: 1rem;
-      margin-top: 2rem;
-    }
-
-    .social-btn {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      padding: 0.6rem 1.3rem;
-      border: 1px solid var(--color-border);
-      border-radius: var(--radius);
-      color: var(--color-muted);
-      font-size: 0.88rem;
-      transition: border-color var(--transition), color var(--transition);
-    }
-    .social-btn:hover { border-color: var(--color-accent); color: var(--color-accent); opacity: 1; }
-
-    /* ── Footer ───────────────────────────────────── */
-    .site-footer {
-      border-top: 1px solid var(--color-border);
-      padding-block: 2rem;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      font-size: 0.82rem;
-      color: var(--color-muted);
-    }
-
-    .footer-logo { font-family: var(--font-mono); color: var(--color-text); }
-    .footer-logo span { color: var(--color-accent); }
-
-    /* ── AI Analyzer ──────────────────────────────── */
-    .analyzer {
-      padding-block: 6rem;
-      background: var(--color-surface);
-      border-top: 1px solid var(--color-border);
-      border-bottom: 1px solid var(--color-border);
-    }
-
-    .az-layout {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 2.5rem;
-      align-items: start;
-    }
-
-    /* ── 拖曳上傳區 ────────────────────────────────── */
-    .az-dropzone {
-      width: 100%;
-      aspect-ratio: 4/3;
-      background: var(--color-bg);
-      border: 2px dashed var(--color-border);
-      border-radius: var(--radius);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      transition: border-color var(--transition), background var(--transition),
-                  transform var(--transition), box-shadow var(--transition);
-      overflow: hidden;
-      position: relative;
-    }
-    .az-dropzone:hover { border-color: var(--color-accent); background: rgba(92,138,255,.04); }
-    .az-dropzone.drag-over {
-      border-color: var(--color-accent);
-      background: rgba(92,138,255,.07);
-      transform: scale(1.012);
-      box-shadow: 0 0 0 4px rgba(92,138,255,.2);
-    }
-    .az-dropzone img {
-      position: absolute;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-    }
-
-    /* 預覽遮罩與 [X] 按鈕 */
-    .az-preview-overlay {
-      position: absolute;
-      inset: 0;
-      background: linear-gradient(to top, rgba(0,0,0,.6) 0%, transparent 50%);
-      pointer-events: none;
-    }
-    .az-clear-btn {
-      position: absolute;
-      top: 0.6rem;
-      right: 0.6rem;
-      width: 2rem;
-      height: 2rem;
-      border-radius: 50%;
-      background: rgba(0,0,0,.55);
-      border: none;
-      color: #fff;
-      font-size: 1.15rem;
-      line-height: 1;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      transition: background var(--transition);
-      z-index: 5;
-    }
-    .az-clear-btn:hover { background: rgba(220,38,38,.8); }
-
-    .az-file-info {
-      position: absolute;
-      bottom: 0.6rem;
-      left: 0.75rem;
-      right: 0.75rem;
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      z-index: 5;
-    }
-    .az-file-name {
-      font-family: var(--font-mono);
-      font-size: 0.72rem;
-      background: rgba(255,255,255,.18);
-      backdrop-filter: blur(6px);
-      border-radius: 999px;
-      padding: 0.2rem 0.75rem;
-      color: #fff;
-      max-width: 200px;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-    .az-gps-badge {
-      font-size: 0.72rem;
-      background: rgba(92,138,255,.75);
-      backdrop-filter: blur(6px);
-      border-radius: 999px;
-      padding: 0.2rem 0.7rem;
-      color: #fff;
-      display: none;
-    }
-    .az-gps-badge.visible { display: inline-block; }
-
-    /* 拖曳 Hover 覆層 */
-    .az-drag-hint {
-      position: absolute;
-      inset: 0;
-      display: none;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 0.7rem;
-      background: rgba(92,138,255,.08);
-      pointer-events: none;
-      z-index: 4;
-    }
-    .az-drag-hint.visible { display: flex; }
-    .az-drag-hint-icon { font-size: 2.5rem; }
-    .az-drag-hint-text { font-size: 1rem; font-weight: 700; color: var(--color-accent); }
-
-    .az-placeholder {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 0.7rem;
-      color: var(--color-muted);
-      font-size: 0.88rem;
-      text-align: center;
-      padding: 2rem;
-      pointer-events: none;
-    }
-    .az-placeholder-icon {
-      font-size: 3rem;
-      opacity: 0.4;
-      animation: az-pulse 2s ease-in-out infinite;
-    }
-    @keyframes az-pulse { 0%,100% { opacity:.4; } 50% { opacity:.15; } }
-    .az-placeholder-hint {
-      font-size: 0.75rem;
-      font-family: var(--font-mono);
-      opacity: 0.6;
-    }
-
-    /* 上傳中 Loading overlay */
-    .az-loading {
-      position: absolute;
-      inset: 0;
-      background: rgba(15,15,19,.88);
-      display: none;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 1rem;
-      z-index: 6;
-    }
-    .az-loading.visible { display: flex; }
-    .az-spinner {
-      width: 38px;
-      height: 38px;
-      border: 3px solid var(--color-border);
-      border-top-color: var(--color-accent);
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-    }
-    @keyframes spin { to { transform: rotate(360deg); } }
-    .az-loading-text {
-      font-family: var(--font-mono);
-      font-size: 0.78rem;
-      letter-spacing: 0.15em;
-      color: var(--color-accent);
-    }
-
-    .az-upload-hint {
-      font-size: 0.75rem;
-      color: var(--color-muted);
-      font-family: var(--font-mono);
-      opacity: 0.6;
-      margin-top: 0.5rem;
-    }
-
-    /* 錯誤提示 */
-    .az-error {
-      margin-top: 0.8rem;
-      background: rgba(255,92,92,.08);
-      border: 1px solid rgba(255,92,92,.3);
-      border-radius: var(--radius);
-      padding: 0.9rem 1.2rem;
-      font-size: 0.83rem;
-      color: #ff8080;
-      display: none;
-      font-family: var(--font-mono);
-    }
-    .az-error.visible { display: block; }
-
-    /* ── 右側面板 ──────────────────────────────────── */
-    .az-right-panel { display: flex; flex-direction: column; gap: 1.2rem; }
-
-    .az-card {
-      background: var(--color-bg);
-      border: 1px solid var(--color-border);
-      border-radius: var(--radius);
-      padding: 1.4rem 1.6rem;
-    }
-
-    .az-card-title {
-      font-family: var(--font-mono);
-      font-size: 0.72rem;
-      letter-spacing: 0.15em;
-      text-transform: uppercase;
-      color: var(--color-accent);
-      margin-bottom: 1rem;
-    }
-
-    /* 場域類型 Segmented Controls */
-    .az-scene-group {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.5rem;
-    }
-
-    .az-scene-pill {
-      padding: 0.3rem 0.9rem;
-      border: 1px solid var(--color-border);
-      border-radius: 999px;
-      font-size: 0.8rem;
-      color: var(--color-muted);
-      background: transparent;
-      cursor: pointer;
-      transition: background var(--transition), color var(--transition),
-                  border-color var(--transition), box-shadow var(--transition);
-      font-family: var(--font-sans);
-    }
-    .az-scene-pill:hover { border-color: var(--color-accent); color: #fff; }
-    .az-scene-pill.active {
-      background: var(--color-accent);
-      color: #fff;
-      border-color: var(--color-accent);
-      box-shadow: 0 2px 10px rgba(92,138,255,.4);
-    }
-
-    /* 分析按鈕 */
-    .az-analyze-btn {
-      width: 100%;
-      padding: 0.8rem 1.5rem;
-      border-radius: var(--radius);
-      font-size: 0.95rem;
-      font-weight: 600;
-      color: #fff;
-      background: linear-gradient(135deg, var(--color-accent), #3a6be8);
-      border: none;
-      cursor: pointer;
-      transition: transform var(--transition), box-shadow var(--transition), opacity var(--transition);
-      box-shadow: 0 4px 20px rgba(92,138,255,.3);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 0.5rem;
-    }
-    .az-analyze-btn:hover:not(:disabled) {
-      transform: translateY(-2px);
-      box-shadow: 0 6px 28px rgba(92,138,255,.5);
-    }
-    .az-analyze-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-
-    /* 分析進度條 */
-    .az-progress-wrap {
-      width: 100%;
-      height: 4px;
-      background: var(--color-border);
-      border-radius: 2px;
-      overflow: hidden;
-      display: none;
-    }
-    .az-progress-wrap.visible { display: block; }
-    .az-progress-bar {
-      height: 100%;
-      background: linear-gradient(90deg, var(--color-accent), var(--color-accent2));
-      border-radius: 2px;
-      animation: az-progress 1.8s ease-in-out infinite;
-    }
-    @keyframes az-progress {
-      0%   { width: 0%; }
-      70%  { width: 80%; }
-      100% { width: 90%; }
-    }
-
-    /* 取消按鈕 */
-    .az-cancel-btn {
-      display: none;
-      background: none;
-      border: none;
-      color: #ff8080;
-      font-size: 0.78rem;
-      font-family: var(--font-mono);
-      cursor: pointer;
-      text-decoration: underline;
-      text-underline-offset: 3px;
-      padding: 0;
-      transition: color var(--transition);
-    }
-    .az-cancel-btn:hover { color: #ffaaaa; }
-    .az-cancel-btn.visible { display: inline-block; }
-
-    /* 6 大元素資訊列表 */
-    .az-elements-info { display: flex; flex-direction: column; gap: 0.55rem; }
-    .az-element-row {
-      display: flex;
-      align-items: center;
-      gap: 0.6rem;
-      font-size: 0.82rem;
-      color: var(--color-muted);
-    }
-    .az-element-dot {
-      width: 8px; height: 8px;
-      border-radius: 50%;
-      flex-shrink: 0;
-    }
-    .az-element-name { color: var(--color-text); font-weight: 500; min-width: 90px; }
-    .az-element-desc { font-size: 0.75rem; opacity: 0.65; }
-
-    /* Toast */
-    .az-toast-container {
-      position: fixed;
-      bottom: 1.5rem;
-      right: 1.5rem;
-      display: flex;
-      flex-direction: column;
-      gap: 0.5rem;
-      z-index: 200;
-      pointer-events: none;
-      max-width: 320px;
-    }
-    .az-toast {
-      display: flex;
-      align-items: flex-start;
-      gap: 0.5rem;
-      padding: 0.75rem 1rem;
-      border-radius: var(--radius);
-      font-size: 0.83rem;
-      color: #fff;
-      pointer-events: auto;
-      border: 1px solid;
-      box-shadow: 0 4px 20px rgba(0,0,0,.45);
-      backdrop-filter: blur(8px);
-      animation: toast-in .3s ease;
-    }
-    @keyframes toast-in {
-      from { opacity: 0; transform: translateX(12px); }
-      to   { opacity: 1; transform: translateX(0); }
-    }
-    .az-toast--error   { background: rgba(120,20,20,.9); border-color: rgba(255,92,92,.4); }
-    .az-toast--success { background: rgba(20,80,40,.9); border-color: rgba(92,200,100,.4); }
-    .az-toast--info    { background: rgba(20,30,80,.9); border-color: rgba(92,138,255,.4); }
-
-    /* ── Responsive ────────────────────────────────── */
-    @media (max-width: 768px) {
-      .nav-links { display: none; }
-      .about-grid { grid-template-columns: 1fr; }
-      .hero-stats { gap: 1.5rem; }
-      .site-footer { flex-direction: column; gap: 0.5rem; text-align: center; }
-      .btn-outline { margin-left: 0; margin-top: 0.75rem; }
-      .az-layout { grid-template-columns: 1fr; }
-    }
-  </style>
+/* ── Step 3: Map ──────────────────────────────────────────── */
+.map-toolbar{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.8rem;margin-bottom:1rem}
+.map-point-count{font-size:.88rem;color:var(--color-text)}
+.map-toolbar-actions{display:flex;gap:1rem;align-items:center}
+.map-wrap{position:relative;border:1px solid var(--color-border);border-radius:var(--radius);overflow:hidden;margin-bottom:1.5rem}
+#map{width:100%;height:480px;background:var(--color-bg)}
+.no-gps-banner{position:absolute;left:1rem;right:1rem;bottom:1rem;background:rgba(15,15,19,.92);border:1px solid var(--color-accent2);border-radius:var(--radius);padding:.9rem 1.1rem;font-size:.84rem;backdrop-filter:blur(8px);z-index:1000}
+.no-gps-banner p{margin-bottom:.6rem;color:var(--color-text)}
+.pin-confirm-row{display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;font-family:var(--font-mono);font-size:.8rem;color:var(--color-accent2)}
+.legend-text{font-size:.85rem;color:var(--color-muted)}
+.map-popup{font-family:var(--font-sans);font-size:.85rem;min-width:140px}
+.map-popup-emotion{font-weight:700;color:#222;margin-bottom:.3rem}
+.map-popup-desc{color:#555;font-size:.78rem;line-height:1.5}
+</style>
 </head>
 <body>
 
-  <!-- ── Header ── -->
-  <header class="site-header">
-    <div class="container">
-      <nav class="nav">
-        <a href="#" class="nav-logo">Urban<span>.</span>Lab</a>
-        <ul class="nav-links">
-          <li><a href="#about">關於</a></li>
-          <li><a href="#analyzer">AI 解析器</a></li>
-          <li><a href="#contact">聯絡</a></li>
-        </ul>
-      </nav>
+<header class="site-header">
+  <div class="container nav">
+    <div class="nav-logo">Urban<span>Landscape</span>Lab</div>
+    <div class="steps">
+      <div class="step active" data-step="1"><span class="step-num">1</span><span class="step-label">上傳照片</span></div>
+      <div class="step-sep"></div>
+      <div class="step" data-step="2"><span class="step-num">2</span><span class="step-label">AI 分析</span></div>
+      <div class="step-sep"></div>
+      <div class="step" data-step="3"><span class="step-num">3</span><span class="step-label">地圖定位</span></div>
     </div>
-  </header>
+  </div>
+</header>
 
-  <!-- ── Hero ── -->
-  <section class="hero">
-    <div class="hero-bg"></div>
-    <div class="hero-grid"></div>
-    <div class="container">
-      <div class="hero-content">
-        <p class="hero-eyebrow">// Urban Landscape Analysis</p>
-        <h1 class="hero-title">
-          解讀城市<br />
-          <em>景觀的語言</em>
-        </h1>
-        <p class="hero-desc">
-          從街道紋理、建築立面到天際線輪廓，
-          用資料與視覺探索城市空間背後的設計邏輯與文化脈絡。
-        </p>
-        <div>
-          <a href="#analyzer" class="btn btn-primary">使用 AI 解析器</a>
-          <a href="#about" class="btn btn-outline">關於本站</a>
+<main class="container main-content">
+
+  <!-- ════════════ Step 1：上傳照片 ════════════ -->
+  <section id="upload-section">
+    <p class="section-label">// Step 1</p>
+    <h2 class="page-title">上傳城市街景照片</h2>
+    <p class="page-sub">選擇一張街景照片並標記場域類型，AI 將解析景觀元素佔比與環境心理感受。</p>
+
+    <div class="az-layout">
+      <div>
+        <div class="az-dropzone" id="az-dropzone" title="點擊或拖曳上傳照片">
+          <img id="az-preview" src="" alt="景觀照片" style="display:none" />
+          <div class="az-preview-overlay" id="az-preview-overlay" style="display:none"></div>
+          <button class="az-clear-btn" id="az-clear-btn" style="display:none" title="清除圖片">×</button>
+          <div class="az-file-info" id="az-file-info" style="display:none">
+            <span class="az-file-name" id="az-file-name"></span>
+            <span class="az-gps-badge" id="az-gps-badge">📍 含 GPS</span>
+          </div>
+          <div class="az-placeholder" id="az-placeholder">
+            <span class="az-placeholder-icon">🛰️</span>
+            <span>點擊或拖曳上傳景觀照片</span>
+            <span class="az-placeholder-hint">JPG / PNG / WEBP · 上限 4 MB</span>
+          </div>
+          <div class="az-drag-hint" id="az-drag-hint">
+            <span class="az-drag-hint-icon">📥</span>
+            <span class="az-drag-hint-text">放開以上傳</span>
+          </div>
+          <input type="file" id="az-file-input" accept="image/jpeg,image/png,image/webp" style="display:none" />
         </div>
-        <div class="hero-stats">
-          <div>
-            <div class="stat-num">12+</div>
-            <div class="stat-label">分析案例</div>
+        <p class="az-upload-hint">上傳後將自動讀取照片 EXIF GPS 資訊</p>
+        <div class="az-error" id="az-error"></div>
+      </div>
+
+      <div class="az-right-panel">
+        <div class="card">
+          <p class="card-title">// 場域類型 <span style="font-weight:400;opacity:.55;text-transform:none;letter-spacing:0">（選填）</span></p>
+          <div class="az-scene-group" id="az-scene-group">
+            <button class="az-scene-pill" data-scene="水岸空間">💧 水岸空間</button>
+            <button class="az-scene-pill" data-scene="公園綠地">🌳 公園綠地</button>
+            <button class="az-scene-pill" data-scene="歷史街區">🏛️ 歷史街區</button>
+            <button class="az-scene-pill" data-scene="商業鬧區">🏬 商業鬧區</button>
+            <button class="az-scene-pill" data-scene="辦公校園">🏢 辦公校園</button>
+            <button class="az-scene-pill" data-scene="住宅巷弄">🏘️ 住宅巷弄</button>
           </div>
-          <div>
-            <div class="stat-num">8</div>
-            <div class="stat-label">研究城市</div>
-          </div>
-          <div>
-            <div class="stat-num">3</div>
-            <div class="stat-label">研究面向</div>
+        </div>
+
+        <div class="card">
+          <p class="card-title">// 開始分析</p>
+          <button class="az-analyze-btn" id="az-analyze-btn" disabled>
+            <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="flex-shrink:0">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3
+                   m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547
+                   A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531
+                   c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+            </svg>
+            開始 AI 分析
+          </button>
+        </div>
+
+        <div class="card">
+          <p class="card-title">// 分析項目</p>
+          <div class="az-elements-info">
+            <div class="az-element-row"><span class="az-element-dot" style="background:#5cff8c"></span><span class="az-element-name">植栽元素</span><span class="az-element-desc">喬木、灌木、草皮</span></div>
+            <div class="az-element-row"><span class="az-element-dot" style="background:#5cc8ff"></span><span class="az-element-name">藍帶元素</span><span class="az-element-desc">河流、噴泉、運河、水體</span></div>
+            <div class="az-element-row"><span class="az-element-dot" style="background:#5c8aff"></span><span class="az-element-name">天際元素</span><span class="az-element-desc">天空、雲層</span></div>
+            <div class="az-element-row"><span class="az-element-dot" style="background:#a0a0cc"></span><span class="az-element-name">人工硬質</span><span class="az-element-desc">建築立面、鋪面、人行道</span></div>
+            <div class="az-element-row"><span class="az-element-dot" style="background:#ffcc5c"></span><span class="az-element-name">移動與活絡元素</span><span class="az-element-desc">行人、自行車、車輛</span></div>
+            <div class="az-element-row"><span class="az-element-dot" style="background:#ff6b6b"></span><span class="az-element-name">干擾視覺遮蔽</span><span class="az-element-desc">廣告看板、圍欄、電線桿</span></div>
           </div>
         </div>
       </div>
     </div>
   </section>
 
-  <!-- ── About ── -->
-  <section class="about" id="about">
-    <div class="container">
-      <div class="about-grid">
-        <div class="about-text">
-          <p class="section-label">// About</p>
-          <h2 class="section-title">為什麼研究城市景觀？</h2>
-          <div class="divider"></div>
-          <p>
-            城市不只是建築與街道的集合，它是市民情感、記憶與知覺經驗交織的容器。
-            景觀元素是這些心理力量最直接的視覺表達。我們每天穿梭在巷弄間，
-            視覺捕捉到的每一抹綠意、每一道紅磚拱廊，都在無形中形塑了我們的情緒起伏。
-          </p>
-          <p>
-            本站結合最新的 AI 語意分割技術與環境心理學模型，透過大數據視覺化，
-            嘗試拆解都市實體要素（植栽、天際、人工硬質、干擾遮蔽）與人類感知經驗之間的深層脈絡，
-            量化空間帶給人的「精神場所感（Spirit of Place）」，
-            思考如何設計更具療癒性、更有溫度的都市空間。
-          </p>
-          <div class="tag-list">
-            <span class="tag">都市設計</span>
-            <span class="tag">景觀心理學</span>
-            <span class="tag">視覺知覺</span>
-            <span class="tag">情緒地圖</span>
-            <span class="tag">語意分割</span>
-            <span class="tag">精神場所</span>
-            <span class="tag">空間資料</span>
-          </div>
+  <!-- ════════════ Step 2：AI 分析結果 ════════════ -->
+  <section id="result-section" class="hidden">
+    <p class="section-label">// Step 2</p>
+    <h2 class="page-title">AI 景觀與情緒分析結果</h2>
+    <p class="page-sub">解析街景影像的視覺構成比例，並評估環境心理情緒感受。</p>
+
+    <div id="res-progress" class="card progress-card">
+      <div class="progress-spinner"></div>
+      <p id="progress-text" class="progress-text">正在上傳圖片…</p>
+      <div class="az-progress-wrap visible"><div class="az-progress-bar"></div></div>
+    </div>
+
+    <div class="az-error" id="res-error"></div>
+
+    <div id="res-content" class="hidden">
+      <div class="res-media-row">
+        <div class="res-media-thumb"><img id="res-preview" src="" alt="分析照片" /></div>
+        <div class="res-badges">
+          <span class="badge" id="res-scene-badge"></span>
+          <span class="badge badge-gps hidden" id="res-gps-badge"></span>
+          <span class="badge-muted" id="res-time-badge"></span>
         </div>
-        <div class="feature-cards">
-          <div class="feature-card">
-            <div class="feature-icon">🧩</div>
-            <div>
-              <h4>景觀元素拆解</h4>
-              <p>分析照片中植栽、藍帶、人工硬質與天際元素的占比，將複雜的街景影像轉譯為可量化的都市環境指標。</p>
-            </div>
-          </div>
-          <div class="feature-card">
-            <div class="feature-icon">🧠</div>
-            <div>
-              <h4>情緒維度感知</h4>
-              <p>導入環境心理學量表，透過 AI 評估街景空間在情感維度上的表現，探討街道寬高比與視覺遮蔽度對心理壓力的影響。</p>
-            </div>
-          </div>
-          <div class="feature-card">
-            <div class="feature-icon">🏘️</div>
-            <div>
-              <h4>場域特性說明</h4>
-              <p>解讀不同都市場域（如歷史街區、水岸空間、住宅巷弄）的紋理特徵，剖析人工硬質比例與歷史人文氛圍的共生關係。</p>
-            </div>
-          </div>
-          <div class="feature-card">
-            <div class="feature-icon">🗺️</div>
-            <div>
-              <h4>空間情緒地圖</h4>
-              <p>整合田野調查的照片點位與 GPS 資訊，將個體對街道的感官知覺投射於地理資訊系統中，勾勒出城市的感官情緒網絡。</p>
+      </div>
+
+      <div class="res-grid">
+        <div class="card">
+          <p class="card-title">// 景觀元素佔比</p>
+          <div class="chart-wrap">
+            <canvas id="pie-chart"></canvas>
+            <div class="chart-center">
+              <div id="dominant-pct" class="chart-center-pct"></div>
+              <div id="dominant-name" class="chart-center-name"></div>
             </div>
           </div>
         </div>
+        <div class="card">
+          <p class="card-title">// 元素明細</p>
+          <div id="elements-list"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <p class="card-title">// 環境特性說明</p>
+        <p id="description-text" class="description-text"></p>
+      </div>
+
+      <div class="card">
+        <p class="card-title">// 環境心理情緒分析（Russell 環形情緒模型）</p>
+        <div class="emo-summary">
+          <div class="color-swatch" id="color-swatch"></div>
+          <div class="emo-summary-text">
+            <div class="emo-dominant" id="dominant-emotion"></div>
+            <div class="color-meta"><span id="color-hex"></span> · <span id="color-hsl"></span> · 強度 <span id="color-distance"></span></div>
+          </div>
+          <div class="radar-wrap"><canvas id="radar-chart"></canvas></div>
+        </div>
+        <div id="emotion-grid" class="emotion-grid"></div>
+      </div>
+
+      <div class="actions-row">
+        <button class="btn-secondary" id="restart-btn">🔄 重新分析另一張照片</button>
+        <button class="btn-primary" id="goto-map-btn">📍 前往地圖定位</button>
       </div>
     </div>
   </section>
 
-  <!-- ── AI Analyzer ── -->
-  <section class="analyzer" id="analyzer">
-    <div class="container">
-      <p class="section-label">// AI Analysis</p>
-      <h2 class="section-title">AI 景觀元素解析器</h2>
-      <div class="divider"></div>
+  <!-- ════════════ Step 3：地圖定位 ════════════ -->
+  <section id="map-section" class="hidden">
+    <p class="section-label">// Step 3</p>
+    <h2 class="page-title">情緒地圖定位</h2>
+    <p class="page-sub">將此次分析結果標記於地圖上，建立你的城市情緒色彩地圖。</p>
 
-      <div class="az-layout">
+    <div class="map-toolbar">
+      <div class="map-point-count">📍 已記錄 <span id="point-count">0</span> 個點位</div>
+      <div class="map-toolbar-actions">
+        <button class="btn-text" id="back-to-result-btn">← 返回分析結果</button>
+        <button class="btn-danger" id="clear-map-btn">🗑️ 清除所有點位</button>
+      </div>
+    </div>
 
-        <!-- 左側：拖放上傳區 -->
-        <div>
-          <div class="az-dropzone" id="az-dropzone" title="點擊或拖曳上傳照片">
-            <!-- 上傳後的圖片預覽 -->
-            <img id="az-preview" src="" alt="景觀照片" style="display:none" />
-            <div class="az-preview-overlay" id="az-preview-overlay" style="display:none"></div>
-
-            <!-- [X] 清除按鈕（已上傳後顯示） -->
-            <button class="az-clear-btn" id="az-clear-btn" style="display:none" title="清除圖片">×</button>
-
-            <!-- 底部檔案資訊（已上傳後顯示） -->
-            <div class="az-file-info" id="az-file-info" style="display:none">
-              <span class="az-file-name" id="az-file-name"></span>
-              <span class="az-gps-badge" id="az-gps-badge">📍 含 GPS</span>
-            </div>
-
-            <!-- 狀態 A：預設虛線框提示 -->
-            <div class="az-placeholder" id="az-placeholder">
-              <span class="az-placeholder-icon">🛰️</span>
-              <span>點擊或拖曳上傳景觀照片</span>
-              <span class="az-placeholder-hint">JPG / PNG / WEBP · 上限 4 MB</span>
-            </div>
-
-            <!-- 狀態 B：Drag Hover 覆層 -->
-            <div class="az-drag-hint" id="az-drag-hint">
-              <span class="az-drag-hint-icon">📥</span>
-              <span class="az-drag-hint-text">放開以上傳</span>
-            </div>
-
-            <!-- 分析中 Loading overlay -->
-            <div class="az-loading" id="az-loading">
-              <div class="az-spinner"></div>
-              <span class="az-loading-text" id="az-loading-text">AI 分析中…</span>
-            </div>
-
-            <input type="file" id="az-file-input" accept="image/jpeg,image/png,image/webp" style="display:none" />
-          </div>
-
-          <p class="az-upload-hint">上傳後呼叫後端 API 進行景觀元素解析</p>
-          <div class="az-error" id="az-error"></div>
+    <div class="map-wrap">
+      <div id="map"></div>
+      <div id="no-gps-banner" class="no-gps-banner hidden">
+        <p>📡 這張照片沒有 GPS 定位資訊。請在地圖上拖曳圖釘 📍 至拍攝地點，再按下確認。</p>
+        <div class="pin-confirm-row">
+          <span>目前座標：<span id="pin-coords">—</span></span>
+          <button class="btn-primary btn-sm" id="pin-confirm-btn">確認位置</button>
         </div>
+      </div>
+    </div>
 
-        <!-- 右側：設定與行動面板 -->
-        <div class="az-right-panel">
+    <div class="legend card">
+      <p class="card-title">// 圖例說明</p>
+      <p class="legend-text">地圖上的色彩光點代表該地點分析結果的主導情緒色彩；點擊光點可查看詳細描述。</p>
+    </div>
 
-          <!-- 場域類型選擇 -->
-          <div class="az-card">
-            <p class="az-card-title">// 場域類型 <span style="font-weight:400;opacity:.55;text-transform:none;letter-spacing:0">（選填）</span></p>
-            <div class="az-scene-group" id="az-scene-group">
-              <button class="az-scene-pill" data-scene="水岸空間">💧 水岸空間</button>
-              <button class="az-scene-pill" data-scene="公園綠地">🌳 公園綠地</button>
-              <button class="az-scene-pill" data-scene="歷史街區">🏛️ 歷史街區</button>
-              <button class="az-scene-pill" data-scene="商業鬧區">🏬 商業鬧區</button>
-              <button class="az-scene-pill" data-scene="辦公校園">🏢 辦公校園</button>
-              <button class="az-scene-pill" data-scene="住宅巷弄">🏘️ 住宅巷弄</button>
-            </div>
-          </div>
-
-          <!-- 分析按鈕 + 進度條 + 取消 -->
-          <div class="az-card">
-            <p class="az-card-title">// 開始分析</p>
-            <button class="az-analyze-btn" id="az-analyze-btn" disabled>
-              <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="flex-shrink:0">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                      d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3
-                         m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547
-                         A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531
-                         c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
-              </svg>
-              開始 AI 分析
-            </button>
-            <div class="az-progress-wrap" id="az-progress-wrap" style="margin-top:.9rem">
-              <div class="az-progress-bar"></div>
-            </div>
-            <div style="margin-top:.6rem; display:flex; align-items:center; justify-content:center;">
-              <button class="az-cancel-btn" id="az-cancel-btn">取消分析</button>
-            </div>
-          </div>
-
-          <!-- 6 大景觀元素說明 -->
-          <div class="az-card">
-            <p class="az-card-title">// 分析項目</p>
-            <div class="az-elements-info">
-              <div class="az-element-row">
-                <span class="az-element-dot" style="background:#5cff8c"></span>
-                <span class="az-element-name">植栽元素</span>
-                <span class="az-element-desc">喬木、灌木、草皮</span>
-              </div>
-              <div class="az-element-row">
-                <span class="az-element-dot" style="background:#5cc8ff"></span>
-                <span class="az-element-name">藍帶元素</span>
-                <span class="az-element-desc">河流、噴泉、運河</span>
-              </div>
-              <div class="az-element-row">
-                <span class="az-element-dot" style="background:#5c8aff"></span>
-                <span class="az-element-name">天際元素</span>
-                <span class="az-element-desc">天空、雲層</span>
-              </div>
-              <div class="az-element-row">
-                <span class="az-element-dot" style="background:#a0a0cc"></span>
-                <span class="az-element-name">人工硬質</span>
-                <span class="az-element-desc">建築立面、鋪面、人行道</span>
-              </div>
-              <div class="az-element-row">
-                <span class="az-element-dot" style="background:#ffcc5c"></span>
-                <span class="az-element-name">移動與活絡元素</span>
-                <span class="az-element-desc">行人、自行車、車輛</span>
-              </div>
-              <div class="az-element-row">
-                <span class="az-element-dot" style="background:#ff6b6b"></span>
-                <span class="az-element-name">干擾視覺遮蔽</span>
-                <span class="az-element-desc">廣告看板、圍欄、電線</span>
-              </div>
-            </div>
-            <p style="font-size:.75rem;color:var(--color-muted);opacity:.55;margin-top:1rem;font-family:var(--font-mono)">
-              分析完成後將自動跳轉至結果頁面。
-            </p>
-          </div>
-
-        </div><!-- /az-right-panel -->
-      </div><!-- /az-layout -->
+    <div class="actions-row">
+      <button class="btn-secondary" id="restart-btn-2">🔄 開始新的分析</button>
     </div>
   </section>
 
-  <!-- ── Contact ── -->
-  <section class="contact" id="contact">
-    <div class="container">
-      <p class="section-label">// Contact</p>
-      <h2 class="section-title">交流與合作</h2>
-      <div class="divider"></div>
-      <p class="contact-desc">
-        如果你對城市景觀研究有興趣，歡迎透過以下管道聯絡，
-        無論是資料共享、田野合作或單純的想法交流都很歡迎。
-      </p>
-      <a href="mailto:hello@example.com" class="btn btn-primary">寄送信件</a>
-      <div class="social-links">
-        <a href="#" class="social-btn">⌨ GitHub</a>
-        <a href="#" class="social-btn">✍ Medium</a>
-        <a href="#" class="social-btn">📷 Instagram</a>
+</main>
+
+<script>
+// ════════════════════════════════════════════════════════════════
+// 設定資料
+// ════════════════════════════════════════════════════════════════
+const ELEMENT_CONFIG = {
+  '植栽元素':       { color: '#5cff8c', icon: '🌳', desc: '喬木、灌木、草皮' },
+  '藍帶元素':       { color: '#5cc8ff', icon: '💧', desc: '河流、噴泉、運河、水體' },
+  '天際元素':       { color: '#5c8aff', icon: '☁️', desc: '天空、雲層' },
+  '人工硬質':       { color: '#a0a0cc', icon: '🏢', desc: '建築立面、鋪面、人行道' },
+  '移動與活絡元素': { color: '#ffcc5c', icon: '🚶', desc: '行人、自行車、車輛' },
+  '干擾視覺遮蔽':   { color: '#ff6b6b', icon: '🚧', desc: '廣告看板、圍欄、電線桿' },
+};
+
+const EMOTION_CONFIG = {
+  '驚奇': { icon: '✨', color: '#a78bfa' },
+  '愉快': { icon: '😊', color: '#fbbf24' },
+  '滿足': { icon: '🙂', color: '#34d399' },
+  '放鬆': { icon: '😌', color: '#5c8aff' },
+  '疲憊': { icon: '😴', color: '#94a3b8' },
+  '沮喪': { icon: '😔', color: '#6b7280' },
+  '緊張': { icon: '😬', color: '#f97316' },
+  '驚恐': { icon: '😨', color: '#ef4444' },
+};
+const EMOTION_KEYS = Object.keys(EMOTION_CONFIG);
+
+const DEFAULT_CENTER = [23.8, 121.0];   // 台灣中心
+const DEFAULT_ZOOM   = 7.2;
+
+// ════════════════════════════════════════════════════════════════
+// 全域狀態
+// ════════════════════════════════════════════════════════════════
+const state = {
+  file: null,
+  sceneType: null,
+  lat: null,
+  lon: null,
+  hasRealGps: false,
+  analysis: null,
+  emotion: null,
+  uploadPromise: null,
+};
+
+let map = null, mapInitialized = false;
+let pieChart = null, radarChart = null;
+let mapLayers = [];
+let draggablePin = null;
+
+// ════════════════════════════════════════════════════════════════
+// Step 切換
+// ════════════════════════════════════════════════════════════════
+function showSection(id) {
+  ['upload-section', 'result-section', 'map-section'].forEach(s => {
+    document.getElementById(s).classList.toggle('hidden', s !== id);
+  });
+
+  const order = ['upload-section', 'result-section', 'map-section'];
+  const idx = order.indexOf(id);
+  document.querySelectorAll('.step').forEach((el, i) => {
+    el.classList.toggle('active', i === idx);
+    el.classList.toggle('done', i < idx);
+  });
+
+  if (id === 'map-section') {
+    if (!mapInitialized) initMap();
+    // 【關鍵修復】切換到地圖區塊的瞬間，強制重新計算地圖尺寸，避免破圖
+    map.invalidateSize();
+    setTimeout(() => map.invalidateSize(), 200);
+    onEnterMapSection();
+  }
+}
+
+// ════════════════════════════════════════════════════════════════
+// Step 1：拖曳上傳
+// ════════════════════════════════════════════════════════════════
+const dropzone     = document.getElementById('az-dropzone');
+const fileInput    = document.getElementById('az-file-input');
+const preview      = document.getElementById('az-preview');
+const previewOverlay = document.getElementById('az-preview-overlay');
+const clearBtn     = document.getElementById('az-clear-btn');
+const fileInfo     = document.getElementById('az-file-info');
+const fileNameEl   = document.getElementById('az-file-name');
+const gpsBadge     = document.getElementById('az-gps-badge');
+const placeholder  = document.getElementById('az-placeholder');
+const dragHint     = document.getElementById('az-drag-hint');
+const errorBox     = document.getElementById('az-error');
+const sceneGroup   = document.getElementById('az-scene-group');
+const analyzeBtn   = document.getElementById('az-analyze-btn');
+
+dropzone.addEventListener('click', () => fileInput.click());
+fileInput.addEventListener('change', e => {
+  if (e.target.files[0]) handleFile(e.target.files[0]);
+});
+
+['dragenter', 'dragover'].forEach(evt => {
+  dropzone.addEventListener(evt, e => {
+    e.preventDefault();
+    dropzone.classList.add('drag-over');
+    dragHint.classList.add('visible');
+  });
+});
+['dragleave', 'drop'].forEach(evt => {
+  dropzone.addEventListener(evt, e => {
+    e.preventDefault();
+    dropzone.classList.remove('drag-over');
+    dragHint.classList.remove('visible');
+  });
+});
+dropzone.addEventListener('drop', e => {
+  const f = e.dataTransfer.files[0];
+  if (f) handleFile(f);
+});
+
+clearBtn.addEventListener('click', e => {
+  e.stopPropagation();
+  resetUpload();
+});
+
+function showUploadError(msg) {
+  errorBox.textContent = msg;
+  errorBox.classList.add('visible');
+}
+function clearUploadError() {
+  errorBox.textContent = '';
+  errorBox.classList.remove('visible');
+}
+
+function handleFile(file) {
+  clearUploadError();
+  const allowed = ['image/jpeg', 'image/png', 'image/webp'];
+  if (!allowed.includes(file.type)) {
+    showUploadError('不支援的檔案格式，請上傳 JPG、PNG 或 WEBP。');
+    return;
+  }
+  if (file.size > 4 * 1024 * 1024) {
+    showUploadError(`檔案大小 ${(file.size / 1024 / 1024).toFixed(1)} MB 超過 4 MB 上限，請壓縮後重試。`);
+    return;
+  }
+
+  state.file = file;
+  state.lat = null;
+  state.lon = null;
+  state.hasRealGps = false;
+
+  const reader = new FileReader();
+  reader.onload = e => {
+    preview.src = e.target.result;
+    preview.style.display = 'block';
+    previewOverlay.style.display = 'block';
+    placeholder.style.display = 'none';
+    clearBtn.style.display = 'flex';
+    fileInfo.style.display = 'flex';
+    fileNameEl.textContent = file.name;
+    gpsBadge.classList.remove('visible');
+  };
+  reader.readAsDataURL(file);
+
+  analyzeBtn.disabled = false;
+
+  // 透過 /api/upload 提取 EXIF GPS（背景進行，分析時會等待完成）
+  state.uploadPromise = uploadForGps(file);
+}
+
+async function uploadForGps(file) {
+  try {
+    const fd = new FormData();
+    fd.append('file', file);
+    const res = await fetch('/api/upload', { method: 'POST', body: fd });
+    if (!res.ok) return;
+    const data = await res.json();
+    state.lat = data.latitude;
+    state.lon = data.longitude;
+    state.hasRealGps = data.latitude != null && data.longitude != null;
+    if (state.hasRealGps) gpsBadge.classList.add('visible');
+  } catch (err) {
+    console.warn('GPS 提取失敗（不影響分析）：', err);
+  }
+}
+
+function resetUpload() {
+  state.file = null;
+  state.lat = null;
+  state.lon = null;
+  state.hasRealGps = false;
+  state.uploadPromise = null;
+
+  fileInput.value = '';
+  preview.src = '';
+  preview.style.display = 'none';
+  previewOverlay.style.display = 'none';
+  placeholder.style.display = 'flex';
+  clearBtn.style.display = 'none';
+  fileInfo.style.display = 'none';
+  gpsBadge.classList.remove('visible');
+  clearUploadError();
+  analyzeBtn.disabled = true;
+}
+
+// 場域類型選擇
+sceneGroup.querySelectorAll('.az-scene-pill').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const isActive = btn.classList.contains('active');
+    sceneGroup.querySelectorAll('.az-scene-pill').forEach(b => b.classList.remove('active'));
+    if (!isActive) {
+      btn.classList.add('active');
+      state.sceneType = btn.dataset.scene;
+    } else {
+      state.sceneType = null;
+    }
+  });
+});
+
+// ════════════════════════════════════════════════════════════════
+// Step 1 → Step 2：開始 AI 分析
+// ════════════════════════════════════════════════════════════════
+const resProgress   = document.getElementById('res-progress');
+const resProgressTx = document.getElementById('progress-text');
+const resError      = document.getElementById('res-error');
+const resContent    = document.getElementById('res-content');
+
+analyzeBtn.addEventListener('click', startAnalysis);
+
+async function startAnalysis() {
+  if (!state.file) return;
+
+  showSection('result-section');
+  resProgress.classList.remove('hidden');
+  resContent.classList.add('hidden');
+  resError.classList.remove('visible');
+  resError.textContent = '';
+
+  try {
+    if (state.uploadPromise) {
+      resProgressTx.textContent = '正在讀取照片資訊與 GPS…';
+      await state.uploadPromise;
+    }
+
+    resProgressTx.textContent = '正在解析景觀元素比例…';
+    const fd1 = new FormData();
+    fd1.append('file', state.file);
+    if (state.sceneType) fd1.append('scene_type', state.sceneType);
+    if (state.hasRealGps) {
+      fd1.append('latitude', state.lat);
+      fd1.append('longitude', state.lon);
+    }
+    const res1 = await fetch('/api/analyze', { method: 'POST', body: fd1 });
+    if (!res1.ok) {
+      const err = await res1.json().catch(() => ({}));
+      throw new Error(err.detail || `分析失敗（${res1.status}）`);
+    }
+    state.analysis = await res1.json();
+
+    resProgressTx.textContent = '正在進行環境心理情緒分析…';
+    const fd2 = new FormData();
+    fd2.append('file', state.file);
+    if (state.sceneType) fd2.append('scene_type', state.sceneType);
+    fd2.append('landscape_description', state.analysis.description);
+    if (state.hasRealGps) {
+      fd2.append('latitude', state.lat);
+      fd2.append('longitude', state.lon);
+    }
+    const res2 = await fetch('/api/emotion', { method: 'POST', body: fd2 });
+    if (!res2.ok) {
+      const err = await res2.json().catch(() => ({}));
+      throw new Error(err.detail || `情緒分析失敗（${res2.status}）`);
+    }
+    state.emotion = await res2.json();
+
+    renderResult();
+    resProgress.classList.add('hidden');
+    resContent.classList.remove('hidden');
+
+  } catch (err) {
+    resProgress.classList.add('hidden');
+    resError.textContent = '⚠ ' + err.message;
+    resError.classList.add('visible');
+  }
+}
+
+// ── 渲染分析結果 ──────────────────────────────────────────────────
+function renderResult() {
+  // 預覽圖／徽章
+  document.getElementById('res-preview').src = preview.src;
+
+  const sceneBadge = document.getElementById('res-scene-badge');
+  if (state.analysis.scene_type) {
+    sceneBadge.textContent = '🏷️ ' + state.analysis.scene_type;
+    sceneBadge.classList.remove('hidden');
+  } else {
+    sceneBadge.classList.add('hidden');
+  }
+
+  const gpsBadgeEl = document.getElementById('res-gps-badge');
+  if (state.hasRealGps) {
+    gpsBadgeEl.textContent = `📍 ${state.lat.toFixed(5)}, ${state.lon.toFixed(5)}`;
+    gpsBadgeEl.classList.remove('hidden');
+  } else {
+    gpsBadgeEl.classList.add('hidden');
+  }
+
+  const timeBadge = document.getElementById('res-time-badge');
+  if (state.analysis.created_at) {
+    const d = new Date(state.analysis.created_at);
+    timeBadge.textContent = '分析時間：' + d.toLocaleString('zh-TW');
+  }
+
+  renderPieChart(state.analysis.elements_ratio);
+  renderElementsList(state.analysis.elements_ratio);
+  document.getElementById('description-text').textContent = state.analysis.description;
+
+  renderColorSwatch(state.emotion.color);
+  renderEmotionCards(state.emotion);
+  renderRadarChart(state.emotion);
+}
+
+function renderPieChart(elementsRatio) {
+  const entries = Object.entries(elementsRatio);
+  const labels  = entries.map(([k]) => k);
+  const data    = entries.map(([, v]) => v);
+  const colors  = entries.map(([k]) => (ELEMENT_CONFIG[k] || {}).color || '#888');
+
+  if (pieChart) pieChart.destroy();
+  pieChart = new Chart(document.getElementById('pie-chart'), {
+    type: 'doughnut',
+    data: { labels, datasets: [{ data, backgroundColor: colors, borderWidth: 0 }] },
+    options: {
+      cutout: '62%',
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => `${c.label}：${c.formattedValue}%` } } },
+    },
+  });
+
+  const dominant = entries.reduce((a, b) => (a[1] > b[1] ? a : b));
+  document.getElementById('dominant-pct').textContent  = dominant[1] + '%';
+  document.getElementById('dominant-name').textContent = dominant[0];
+}
+
+function renderElementsList(elementsRatio) {
+  const container = document.getElementById('elements-list');
+  container.innerHTML = '';
+  Object.entries(elementsRatio).forEach(([key, val]) => {
+    const cfg = ELEMENT_CONFIG[key] || { color: '#888', icon: '•', desc: '' };
+    const row = document.createElement('div');
+    row.className = 'res-element-row';
+    row.innerHTML = `
+      <div class="res-element-head">
+        <span class="res-element-icon">${cfg.icon}</span>
+        <span class="res-element-name">${key}</span>
+        <span class="res-element-pct">${val}%</span>
       </div>
-    </div>
-  </section>
+      <div class="res-bar-track"><div class="res-bar-fill" style="background:${cfg.color}"></div></div>
+      <div class="res-element-desc">${cfg.desc}</div>
+    `;
+    container.appendChild(row);
+    requestAnimationFrame(() => {
+      row.querySelector('.res-bar-fill').style.width = val + '%';
+    });
+  });
+}
 
-  <!-- ── Footer ── -->
-  <footer>
-    <div class="container">
-      <div class="site-footer">
-        <span class="footer-logo">Urban<span>.</span>Lab</span>
-        <span>© 2026 · 城市景觀解析個人研究站</span>
+function dominantEmotionKey() {
+  let domKey = EMOTION_KEYS[0], domScore = -1;
+  EMOTION_KEYS.forEach(k => {
+    const s = state.emotion[k].score;
+    if (s > domScore) { domScore = s; domKey = k; }
+  });
+  return domKey;
+}
+
+function renderColorSwatch(color) {
+  const swatch = document.getElementById('color-swatch');
+  swatch.style.background = color.hex;
+  swatch.style.setProperty('--swatch-glow', color.hex);
+  document.getElementById('color-hex').textContent  = color.hex.toUpperCase();
+  document.getElementById('color-hsl').textContent  = color.hsl;
+  document.getElementById('color-distance').textContent = color.distance;
+
+  const domKey = dominantEmotionKey();
+  document.getElementById('dominant-emotion').textContent =
+    `${EMOTION_CONFIG[domKey].icon} 主導情緒：${domKey}`;
+}
+
+function renderEmotionCards(emotion) {
+  const grid = document.getElementById('emotion-grid');
+  grid.innerHTML = '';
+  EMOTION_KEYS.forEach(key => {
+    const cfg  = EMOTION_CONFIG[key];
+    const item = emotion[key];
+    const dots = [1, 2, 3, 4, 5].map(i =>
+      `<span class="emo-dot" style="${i <= item.score ? `background:${cfg.color};border-color:${cfg.color}` : ''}"></span>`
+    ).join('');
+    const card = document.createElement('div');
+    card.className = 'emo-card';
+    card.innerHTML = `
+      <div class="emo-card-head">
+        <span class="emo-icon">${cfg.icon}</span>
+        <span class="emo-name">${key}</span>
+        <span class="emo-score" style="color:${cfg.color}">${item.score}</span>
       </div>
-    </div>
-  </footer>
+      <div class="emo-dots">${dots}</div>
+      <p class="emo-reason">${item.reason}</p>
+    `;
+    grid.appendChild(card);
+  });
+}
 
-  <!-- ── Toast 容器 ── -->
-  <div class="az-toast-container" id="az-toast-container"></div>
+function renderRadarChart(emotion) {
+  const labels = EMOTION_KEYS;
+  const data   = labels.map(k => emotion[k].score);
 
-  <script>
-  /* ── AI Analyzer Logic ── */
-  (function () {
-    const isLocal = window.location.protocol === 'file:'
-      || window.location.hostname === '127.0.0.1'
-      || window.location.hostname === 'localhost';
-    const API_BASE = isLocal ? 'http://127.0.0.1:8000' : '';
+  if (radarChart) radarChart.destroy();
+  radarChart = new Chart(document.getElementById('radar-chart'), {
+    type: 'radar',
+    data: {
+      labels,
+      datasets: [{
+        data,
+        backgroundColor: 'rgba(92,138,255,.25)',
+        borderColor: '#5c8aff',
+        pointBackgroundColor: '#5c8aff',
+        borderWidth: 2,
+      }],
+    },
+    options: {
+      scales: {
+        r: {
+          min: 0, max: 5,
+          ticks: { display: false, stepSize: 1 },
+          grid: { color: '#2e2e42' },
+          angleLines: { color: '#2e2e42' },
+          pointLabels: { color: '#d4d4e8', font: { size: 11 } },
+        },
+      },
+      plugins: { legend: { display: false } },
+    },
+  });
+}
 
-    // DOM
-    const dropzone       = document.getElementById('az-dropzone');
-    const fileInput      = document.getElementById('az-file-input');
-    const preview        = document.getElementById('az-preview');
-    const previewOverlay = document.getElementById('az-preview-overlay');
-    const clearBtn       = document.getElementById('az-clear-btn');
-    const fileInfo       = document.getElementById('az-file-info');
-    const fileName       = document.getElementById('az-file-name');
-    const placeholder    = document.getElementById('az-placeholder');
-    const dragHint       = document.getElementById('az-drag-hint');
-    const loading        = document.getElementById('az-loading');
-    const loadingText    = document.getElementById('az-loading-text');
-    const errorEl        = document.getElementById('az-error');
-    const sceneGroup     = document.getElementById('az-scene-group');
-    const analyzeBtn     = document.getElementById('az-analyze-btn');
-    const progressWrap   = document.getElementById('az-progress-wrap');
-    const cancelBtn      = document.getElementById('az-cancel-btn');
-    const toastCont      = document.getElementById('az-toast-container');
+// ════════════════════════════════════════════════════════════════
+// 重新分析
+// ════════════════════════════════════════════════════════════════
+function restartAll() {
+  resetUpload();
+  sceneGroup.querySelectorAll('.az-scene-pill').forEach(b => b.classList.remove('active'));
+  state.sceneType = null;
+  state.analysis = null;
+  state.emotion = null;
+  showSection('upload-section');
+}
+document.getElementById('restart-btn').addEventListener('click', restartAll);
+document.getElementById('restart-btn-2').addEventListener('click', restartAll);
 
-    // 狀態：直接暫存 File 物件，不需先上傳至後端
-    let uploadedFile   = null;   // File 物件
-    let uploadedBase64 = null;   // 純 base64 字串（供 sessionStorage）
-    let selectedScene  = null;
-    let abortController = null;
+// ════════════════════════════════════════════════════════════════
+// Step 2 → Step 3
+// ════════════════════════════════════════════════════════════════
+document.getElementById('goto-map-btn').addEventListener('click', () => showSection('map-section'));
+document.getElementById('back-to-result-btn').addEventListener('click', () => showSection('result-section'));
 
-    /* ── Toast ── */
-    function showToast(msg, type = 'error') {
-      const el = document.createElement('div');
-      el.className = `az-toast az-toast--${type}`;
-      const icons = { error: '⚠️', success: '✅', info: 'ℹ️' };
-      el.innerHTML = `<span style="flex-shrink:0">${icons[type]||'⚠️'}</span><span>${msg}</span>`;
-      toastCont.appendChild(el);
-      setTimeout(() => {
-        el.style.transition = 'opacity .3s ease';
-        el.style.opacity = '0';
-        setTimeout(() => el.remove(), 300);
-      }, 3500);
-    }
+// ════════════════════════════════════════════════════════════════
+// Step 3：Leaflet 地圖
+// ════════════════════════════════════════════════════════════════
+function initMap() {
+  map = L.map('map', { center: DEFAULT_CENTER, zoom: DEFAULT_ZOOM, zoomControl: false });
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
+    maxZoom: 19,
+  }).addTo(map);
+  L.control.zoom({ position: 'bottomright' }).addTo(map);
+  mapInitialized = true;
+}
 
-    /* ── 拖曳區狀態 ── */
-    function setZoneState(state) {
-      const showPreview = state === 'preview';
-      const showHover   = state === 'hover';
-      placeholder.style.display   = state === 'default' ? 'flex' : 'none';
-      dragHint.classList.toggle('visible', showHover);
-      preview.style.display        = showPreview ? 'block' : 'none';
-      previewOverlay.style.display = showPreview ? 'block' : 'none';
-      clearBtn.style.display       = showPreview ? 'flex'  : 'none';
-      fileInfo.style.display       = showPreview ? 'flex'  : 'none';
-    }
+async function onEnterMapSection() {
+  await loadMapPoints();
 
-    /* ── 前端驗證 ── */
-    function validateFile(file) {
-      const allowed = ['image/jpeg', 'image/png', 'image/webp'];
-      if (!allowed.includes(file.type)) {
-        showToast('格式不支援，請上傳 JPG、PNG 或 WEBP 圖片。');
-        return false;
-      }
-      if (file.size > 4 * 1024 * 1024) {
-        showToast('⚠️ 檔案大小已超過 4 MB 限制，請壓縮後再試。');
-        return false;
-      }
-      return true;
-    }
+  if (state.hasRealGps && state.emotion) {
+    map.flyTo([state.lat, state.lon], 15);
+    hideNoGpsBanner();
+  } else if (state.emotion) {
+    showNoGpsBanner();
+    spawnDraggablePin();
+  }
+}
 
-    /* ── 處理選定的檔案（本地預覽，不預先上傳）── */
-    function handleFile(file) {
-      if (!validateFile(file)) return;
-      hideError();
-      uploadedFile = file;
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        preview.src = e.target.result;
-        // 擷取純 base64（去掉 data:image/xxx;base64, 前綴）供結果頁使用
-        uploadedBase64 = e.target.result.split(',')[1];
-        setZoneState('preview');
-        fileName.textContent = truncate(file.name, 26);
-        analyzeBtn.disabled = false;
-        showToast('圖片已選取，可開始分析！', 'success');
-      };
-      reader.readAsDataURL(file);
-    }
+async function loadMapPoints() {
+  try {
+    const res = await fetch('/api/map-points');
+    if (!res.ok) return;
+    const points = await res.json();
+    document.getElementById('point-count').textContent = points.length;
 
-    function truncate(str, max) {
-      return str.length <= max ? str : str.slice(0, max - 1) + '…';
-    }
+    mapLayers.forEach(l => map.removeLayer(l));
+    mapLayers = [];
 
-    /* ── 重設上傳 ── */
-    function resetUpload() {
-      uploadedFile   = null;
-      uploadedBase64 = null;
-      fileInput.value = '';
-      preview.src     = '';
-      analyzeBtn.disabled = true;
-      setZoneState('default');
-    }
-
-    /* ── 場域類型 ── */
-    sceneGroup.querySelectorAll('.az-scene-pill').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const scene = btn.dataset.scene;
-        if (selectedScene === scene) {
-          selectedScene = null;
-          btn.classList.remove('active');
-        } else {
-          sceneGroup.querySelectorAll('.az-scene-pill').forEach(b => b.classList.remove('active'));
-          selectedScene = scene;
-          btn.classList.add('active');
-        }
-      });
+    points.forEach(pt => {
+      addEmotionPoint(pt.latitude, pt.longitude, pt.hex_color, pt.dominant_emotion, pt.description, false);
     });
+  } catch (err) {
+    console.warn('讀取地圖點位失敗：', err);
+  }
+}
 
-    /* ── 開始分析：直接將 file + scene_type POST 至 /api/analyze ── */
-    analyzeBtn.addEventListener('click', async () => {
-      if (!uploadedFile) return;
+function addEmotionPoint(lat, lon, hexColor, dominantEmotion, description, openPopup) {
+  const glow = L.circleMarker([lat, lon], {
+    radius: 26, color: hexColor, weight: 0, fillColor: hexColor, fillOpacity: 0.18,
+  }).addTo(map);
+  const core = L.circleMarker([lat, lon], {
+    radius: 8, color: '#fff', weight: 2, fillColor: hexColor, fillOpacity: 0.9,
+  }).addTo(map);
 
-      analyzeBtn.disabled = true;
-      progressWrap.classList.add('visible');
-      cancelBtn.classList.add('visible');
-      loading.classList.add('visible');
+  const icon = (EMOTION_CONFIG[dominantEmotion] || {}).icon || '📍';
+  const popupHtml = `
+    <div class="map-popup">
+      <div class="map-popup-emotion">${icon} ${dominantEmotion}</div>
+      ${description ? `<div class="map-popup-desc">${description}</div>` : ''}
+    </div>`;
+  core.bindPopup(popupHtml);
 
-      abortController = new AbortController();
-      const msgs = ['AI 分析中…', '識別植栽與藍帶…', '計算元素佔比…', '生成環境說明…'];
-      let mi = 0;
-      const msgTimer = setInterval(() => {
-        mi = (mi + 1) % msgs.length;
-        loadingText.textContent = msgs[mi];
-      }, 1800);
+  mapLayers.push(glow, core);
+  if (openPopup) core.openPopup();
+}
 
-      try {
-        const fd = new FormData();
-        fd.append('file', uploadedFile);
-        if (selectedScene) fd.append('scene_type', selectedScene);
+// ── 無 GPS：可拖曳圖釘 ────────────────────────────────────────────
+const noGpsBanner = document.getElementById('no-gps-banner');
+const pinCoordsEl = document.getElementById('pin-coords');
+const pinConfirmBtn = document.getElementById('pin-confirm-btn');
 
-        const res = await fetch(`${API_BASE}/api/analyze`, {
-          method: 'POST',
-          body: fd,
-          signal: abortController.signal,
-        });
+function showNoGpsBanner() { noGpsBanner.classList.remove('hidden'); }
+function hideNoGpsBanner() { noGpsBanner.classList.add('hidden'); }
 
-        clearInterval(msgTimer);
+function spawnDraggablePin() {
+  if (draggablePin) return;
+  map.setView(DEFAULT_CENTER, DEFAULT_ZOOM);
+  const center = map.getCenter();
+  draggablePin = L.marker(center, { draggable: true }).addTo(map);
+  draggablePin.on('dragend', updatePinCoordsDisplay);
+  map.on('click', onMapClickForPin);
+  updatePinCoordsDisplay();
+}
 
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          throw new Error(err.detail || `HTTP ${res.status}`);
-        }
+function onMapClickForPin(e) {
+  if (!draggablePin) return;
+  draggablePin.setLatLng(e.latlng);
+  updatePinCoordsDisplay();
+}
 
-        const data = await res.json();
+function updatePinCoordsDisplay() {
+  const ll = draggablePin.getLatLng();
+  pinCoordsEl.textContent = `${ll.lat.toFixed(5)}, ${ll.lng.toFixed(5)}`;
+}
 
-        // 存至 sessionStorage，跳轉至結果頁
-        sessionStorage.setItem('analysisResult', JSON.stringify({
-          ...data,
-          imageBase64: uploadedBase64,
-          mime_type:   uploadedFile.type,
-          sceneType:   selectedScene,
-        }));
-        window.location.href = 'result.html';
+pinConfirmBtn.addEventListener('click', async () => {
+  if (!draggablePin || !state.emotion) return;
+  const ll = draggablePin.getLatLng();
+  const domKey = dominantEmotionKey();
+  const scoresZh = {};
+  EMOTION_KEYS.forEach(k => scoresZh[k] = state.emotion[k].score);
 
-      } catch (err) {
-        clearInterval(msgTimer);
-        if (err.name === 'AbortError') {
-          showToast('分析已取消。', 'info');
-        } else {
-          showError('分析失敗：' + err.message);
-        }
-        resetAnalyzeUI();
-      }
+  pinConfirmBtn.disabled = true;
+  pinConfirmBtn.textContent = '儲存中…';
+
+  try {
+    const res = await fetch('/api/update-location', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        latitude: ll.lat,
+        longitude: ll.lng,
+        hex_color: state.emotion.color.hex,
+        dominant_emotion: domKey,
+        emotion_scores: scoresZh,
+        description: state.analysis ? state.analysis.description : null,
+        scene_type: state.sceneType,
+      }),
     });
+    if (!res.ok) throw new Error('儲存失敗');
 
-    /* ── 取消分析 ── */
-    cancelBtn.addEventListener('click', () => {
-      if (abortController) { abortController.abort(); abortController = null; }
-    });
+    addEmotionPoint(ll.lat, ll.lng, state.emotion.color.hex, domKey, state.analysis ? state.analysis.description : null, true);
+    map.removeLayer(draggablePin);
+    draggablePin = null;
+    map.off('click', onMapClickForPin);
+    hideNoGpsBanner();
 
-    function resetAnalyzeUI() {
-      analyzeBtn.disabled = !uploadedFile;
-      progressWrap.classList.remove('visible');
-      cancelBtn.classList.remove('visible');
-      loading.classList.remove('visible');
-    }
+    const count = parseInt(document.getElementById('point-count').textContent || '0', 10);
+    document.getElementById('point-count').textContent = count + 1;
+  } catch (err) {
+    alert('位置儲存失敗，請稍後再試。');
+  } finally {
+    pinConfirmBtn.disabled = false;
+    pinConfirmBtn.textContent = '確認位置';
+  }
+});
 
-    /* ── 清除按鈕 ── */
-    clearBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      resetUpload();
-      hideError();
-    });
-
-    /* ── 拖曳事件 ── */
-    dropzone.addEventListener('dragover', (e) => {
-      e.preventDefault();
-      dropzone.classList.add('drag-over');
-      if (!uploadedFile) setZoneState('hover');
-    });
-    dropzone.addEventListener('dragleave', (e) => {
-      if (!dropzone.contains(e.relatedTarget)) {
-        dropzone.classList.remove('drag-over');
-        if (!uploadedFile) setZoneState('default');
-      }
-    });
-    dropzone.addEventListener('drop', (e) => {
-      e.preventDefault();
-      dropzone.classList.remove('drag-over');
-      const f = e.dataTransfer.files[0];
-      if (f) handleFile(f);
-    });
-
-    /* ── 點擊選擇 ── */
-    dropzone.addEventListener('click', (e) => {
-      if (e.target.closest('#az-clear-btn')) return;
-      if (!uploadedFile) fileInput.click();
-    });
-    fileInput.addEventListener('change', () => {
-      if (fileInput.files[0]) handleFile(fileInput.files[0]);
-    });
-
-    /* ── 錯誤提示 ── */
-    function showError(msg) {
-      errorEl.textContent = msg;
-      errorEl.classList.add('visible');
-    }
-    function hideError() { errorEl.classList.remove('visible'); }
-
-    /* ── 初始化 ── */
-    setZoneState('default');
-  })();
-  </script>
-
+// ── 清除所有點位 ─────────────────────────────────────────────────
+document.getElementById('clear-map-btn').addEventListener('click', async () => {
+  if (!confirm('確定要清除所有地圖點位嗎？此操作無法復原。')) return;
+  try {
+    await fetch('/api/map-points', { method: 'DELETE' });
+  } catch (err) {
+    alert('清除失敗，請稍後再試。');
+    return;
+  }
+  mapLayers.forEach(l => map.removeLayer(l));
+  mapLayers = [];
+  if (draggablePin) {
+    map.removeLayer(draggablePin);
+    draggablePin = null;
+    map.off('click', onMapClickForPin);
+  }
+  document.getElementById('point-count').textContent = '0';
+  map.setView(DEFAULT_CENTER, DEFAULT_ZOOM);
+  hideNoGpsBanner();
+});
+</script>
 </body>
 </html>

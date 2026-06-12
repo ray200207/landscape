@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>分析結果 · Urban Landscape Lab</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            surface: '#1a1a24',
+            border:  '#2e2e42',
+            accent:  { DEFAULT: '#5c8aff', dark: '#3a6be8' },
+            accent2: '#ff8c5c',
+            txt:     '#d4d4e8',
+            muted:   '#8888aa',
+          },
+          fontFamily: {
+            sans: ['"Noto Sans TC"', '"Segoe UI"', 'sans-serif'],
+            mono: ['"Cascadia Code"', '"Courier New"', 'monospace'],
+          },
+          keyframes: {
+            fadeUp:  { from: { opacity: '0', transform: 'translateY(16px)' }, to: { opacity: '1', transform: 'translateY(0)' } },
+            scaleIn: { from: { opacity: '0', transform: 'scale(.93)' }, to: { opacity: '1', transform: 'scale(1)' } },
+          },
+          animation: {
+            fadeUp:  'fadeUp 0.55s ease both',
+            scaleIn: 'scaleIn 0.45s ease both',
+          },
+        },
+      },
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #0f0f13; min-height: 100vh; }
+    .bar-fill { transition: width 1s cubic-bezier(.4,0,.2,1) .25s; }
+  </style>
+</head>
+
+<body class="font-sans text-txt">
+
+  <!-- ── 頁首 ─────────────────────────────────────────────────────────────── -->
+  <header class="sticky top-0 z-40 bg-[#0f0f13]/90 backdrop-blur-xl border-b border-border">
+    <div class="max-w-6xl mx-auto px-6 h-[60px] flex items-center gap-3">
+      <a href="/"
+         class="w-8 h-8 rounded-lg bg-surface hover:bg-border border border-border
+                flex items-center justify-center transition-colors flex-shrink-0"
+         title="返回上傳頁">
+        <svg class="w-4 h-4 text-txt" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+        </svg>
+      </a>
+      <span class="font-mono font-bold text-white tracking-wide">
+        Urban<span class="text-accent">.</span>Lab
+      </span>
+      <span class="ml-auto font-mono text-xs text-muted bg-surface px-3 py-1 rounded-full border border-border">
+        02 / 分析結果
+      </span>
+    </div>
+  </header>
+
+  <!-- ── 無資料提示 ────────────────────────────────────────────────────────── -->
+  <div id="no-data" class="hidden max-w-md mx-auto px-6 py-24 text-center">
+    <div class="text-5xl mb-4">🔍</div>
+    <h2 class="text-xl font-bold text-white mb-2">尚無分析資料</h2>
+    <p class="text-muted text-sm mb-6">請先在上傳頁面上傳圖片並完成分析。</p>
+    <a href="/"
+       class="inline-block px-6 py-2.5 rounded-xl bg-accent hover:bg-accent-dark text-white font-semibold transition-colors text-sm">
+      前往上傳頁面
+    </a>
+  </div>
+
+  <!-- ── 主體（分析結果）──────────────────────────────────────────────────── -->
+  <main id="result-content" class="hidden max-w-6xl mx-auto px-6 py-10">
+
+    <!-- 頁面標題列 -->
+    <div class="flex flex-wrap items-center gap-3 mb-8 animate-fadeUp">
+      <h1 class="text-2xl md:text-3xl font-bold text-white">景觀元素分析結果</h1>
+      <span id="scene-badge"
+            class="hidden px-3 py-1 rounded-full text-xs font-mono border border-accent/40 text-accent bg-accent/10"></span>
+      <span id="gps-badge"
+            class="hidden px-3 py-1 rounded-full text-xs border border-accent2/30 text-accent2 bg-accent2/10">
+        📍 含 GPS 資訊
+      </span>
+      <span class="ml-auto font-mono text-xs text-muted" id="created-at"></span>
+    </div>
+
+    <!-- ── 左右兩欄佈局 ───────────────────────────────────────────────────── -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+
+      <!-- 左欄：原始圖片 + GPS 卡 -->
+      <div class="animate-scaleIn" style="animation-delay:.05s">
+        <div class="rounded-xl overflow-hidden border border-border shadow-2xl shadow-black/50">
+          <img id="original-img" src="" alt="上傳的街景照片"
+               class="w-full object-cover" style="aspect-ratio:4/3" />
+        </div>
+        <div id="gps-card" class="hidden mt-3 bg-surface border border-border rounded-xl px-4 py-3">
+          <p class="font-mono text-xs text-muted mb-1">📍 GPS 座標</p>
+          <p class="font-mono text-sm text-txt" id="gps-coords"></p>
+        </div>
+      </div>
+
+      <!-- 右欄：圓環圖 + 元素列表 -->
+      <div class="flex flex-col gap-5 animate-fadeUp" style="animation-delay:.15s">
+
+        <!-- 圓環圖 -->
+        <div class="bg-surface border border-border rounded-xl p-6">
+          <p class="font-mono text-xs tracking-[.15em] uppercase text-accent mb-5">// 視覺元素佔比</p>
+          <div class="relative mx-auto" style="max-width:230px">
+            <canvas id="pie-chart"></canvas>
+            <!-- 環形圖中心文字 -->
+            <div class="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none">
+              <span class="text-3xl font-bold text-white font-mono leading-none" id="dominant-pct">—</span>
+              <span class="text-xs text-muted mt-1 leading-tight px-2" id="dominant-name"></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 元素列表 + 進度條 -->
+        <div class="bg-surface border border-border rounded-xl p-6">
+          <p class="font-mono text-xs tracking-[.15em] uppercase text-accent mb-4">// 各元素明細</p>
+          <ul id="elements-list" class="flex flex-col gap-3.5"></ul>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ── 環境特性說明卡 ─────────────────────────────────────────────────── -->
+    <div class="mt-8 animate-fadeUp" style="animation-delay:.25s">
+      <div class="relative bg-surface border border-border rounded-xl p-6 md:p-8 overflow-hidden">
+        <!-- 背景漸層裝飾 -->
+        <div class="absolute inset-0 bg-gradient-to-br from-accent/5 via-transparent to-accent2/5 pointer-events-none"></div>
+        <div class="relative">
+          <div class="flex items-center gap-2 mb-4">
+            <div class="w-1 h-5 rounded-full bg-gradient-to-b from-accent to-accent2"></div>
+            <p class="font-mono text-xs tracking-[.15em] uppercase text-accent">// AI 環境特性說明</p>
+          </div>
+          <p id="description-text" class="text-txt leading-relaxed text-sm md:text-base"></p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── 操作按鈕列 ───────────────────────────────────────────────────── -->
+    <div class="mt-10 pb-16 flex flex-wrap justify-center gap-4 animate-fadeUp" style="animation-delay:.35s">
+      <!-- 進入情緒分析（主要按鈕） -->
+      <a href="emotion.html"
+         class="inline-flex items-center gap-2 px-8 py-3 rounded-xl
+                bg-accent hover:bg-accent-dark
+                font-semibold text-sm text-white transition-colors shadow-lg shadow-accent/20">
+        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"/>
+        </svg>
+        進入環境情緒分析
+      </a>
+      <!-- 再次分析（次要按鈕） -->
+      <a href="/"
+         class="inline-flex items-center gap-2 px-8 py-3 rounded-xl
+                bg-surface hover:bg-border border border-border
+                font-semibold text-sm text-muted transition-colors">
+        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+        </svg>
+        再次分析另一張照片
+      </a>
+    </div>
+
+  </main>
+
+  <script src="js/result.js"></script>
+</body>
+</html>

@@ -1,0 +1,19 @@
+# ── Urban Landscape Lab — Python 依賴清單 ──────────────────────────────────
+# 安裝指令：pip install -r requirements.txt
+
+# Web 框架
+fastapi>=0.115.0
+uvicorn[standard]>=0.32.0
+python-multipart>=0.0.12      # FastAPI 接收 multipart/form-data 必備
+
+# Gemini API（官方最新 SDK：google-genai）
+google-genai>=1.0.0
+
+# 圖片處理 + EXIF 解析
+Pillow>=11.0.0
+
+# 環境變數管理
+python-dotenv>=1.0.1
+
+# 資料驗證（FastAPI 內建，但明確標注版本）
+pydantic>=2.9.0

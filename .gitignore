@@ -1,0 +1,33 @@
+# 環境變數（絕對不能進 git）
+.env
+.env.local
+.env.*.local
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+cloudflared.exe
+
+# SQLite 本地資料庫（不進版本控制）
+*.db
+*.db-shm
+*.db-wal
+database/
